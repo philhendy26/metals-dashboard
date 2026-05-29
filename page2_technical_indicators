@@ -1,1 +1,27 @@
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import plotly.graph_objects as go
+import pandas_ta as ta
+from plotly.subplots import make_subplots
 
+gold = yf.download("GC=F", period="1y")
+copper = yf.download("HG=F", period="1y")
+
+# Add indicators
+gold = gold.ta.add_all()
+copper = copper.ta.add_all()
+
+st.title("🔥 Technical Indicators Overload")
+
+col1, col2 = st.columns(2)
+with col1:
+    fig_rsi = make_subplots(rows=2, cols=1, row_heights=[0.7, 0.3])
+    fig_rsi.add_trace(go.Scatter(y=gold['Close'], name="Gold", line=dict(color='gold')), row=1, col=1)
+    fig_rsi.add_trace(go.Scatter(y=gold['RSI_14'], name="RSI", line=dict(color='violet')), row=2, col=1)
+    st.plotly_chart(fig_rsi, use_container_width=True)
+
+with col2:
+    fig_macd = go.Figure()
+    fig_macd.add_bar(y=copper['MACDh_12_26_9'], name="MACD Hist", marker_color=['lime' if x>0 else 'red' for x in copper['MACDh_12_26_9']])
+    st.plotly_chart(fig_macd, use_container_width=True)
