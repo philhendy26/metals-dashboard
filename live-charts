@@ -1,0 +1,19 @@
+import streamlit as st
+import yfinance as yf
+import plotly.graph_objects as go
+
+st.title("📈 Live Price Action")
+
+gold = yf.download("GC=F", period="1y")
+copper = yf.download("HG=F", period="1y")
+
+col1, col2 = st.columns(2)
+with col1:
+    fig = go.Figure(data=[go.Candlestick(x=gold.index, open=gold.Open, high=gold.High, low=gold.Low, close=gold.Close)])
+    fig.update_layout(title="Gold (GC=F) - Neon Candles", template="plotly_dark", height=600)
+    st.plotly_chart(fig, use_container_width=True)
+
+with col2:
+    fig2 = go.Figure(data=[go.Candlestick(x=copper.index, open=copper.Open, high=copper.High, low=copper.Low, close=copper.Close)])
+    fig2.update_layout(title="Copper (HG=F) - Neon Candles", template="plotly_dark", height=600)
+    st.plotly_chart(fig2, use_container_width=True)
