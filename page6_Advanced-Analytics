@@ -1,0 +1,7 @@
+import streamlit as st
+import plotly.express as px
+
+st.title("📊 Advanced Analytics & Correlation")
+
+# Copper/Gold Ratio, Heatmaps, Momentum, etc.
+st.plotly_chart(px.imshow(np.random.rand(5,5), color_continuous_scale='RdYlGn'), use_container_width=True)
