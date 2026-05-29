@@ -1,0 +1,9 @@
+metals_dashboard/
+├── main.py
+├── pages/
+│   ├── 1_Live_Charts.py
+│   ├── 2_Technical_Indicators.py
+│   ├── 3_LSTM_Forecast.py
+│   ├── 4_Options_Chain.py
+│   ├── 5_Monte_Carlo_Simulation.py
+│   └── 6_Advanced_Analytics.py
