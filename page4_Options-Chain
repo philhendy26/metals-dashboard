@@ -1,0 +1,24 @@
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+
+st.title("🌐 Options Chain & Implied Volatility")
+
+gold = yf.Ticker("GC=F")
+copper = yf.Ticker("HG=F")
+
+st.subheader("Gold Options Chain (Nearest Expiry)")
+try:
+    opt = gold.option_chain(gold.options[0])
+    st.dataframe(opt.calls[['strike', 'lastPrice', 'impliedVolatility', 'volume']].head(15), use_container_width=True)
+except:
+    st.warning("Live options data limited — Showing simulated realistic chain")
+
+# Simulated Enhanced Chain
+sim_options = pd.DataFrame({
+    'Strike': [2400, 2450, 2500, 2550, 2600],
+    'Call IV': [18.5, 17.8, 16.9, 17.2, 18.1],
+    'Put IV': [19.2, 18.5, 17.4, 17.8, 19.0],
+    'Delta': [0.65, 0.52, 0.48, 0.35, 0.22]
+})
+st.dataframe(sim_options, use_container_width=True)
