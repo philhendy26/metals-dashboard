@@ -1,0 +1,183 @@
+pip install streamlit yfinance pandas numpy plotly pandas_ta scikit-learn tensorflow keras
+
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+import pandas_ta as ta
+from datetime import datetime, timedelta
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Dropout
+import warnings
+warnings.filterwarnings('ignore')
+
+st.set_page_config(page_title="🪙 METALS COMMAND CENTER v2", layout="wide")
+st.title("🪙 COPPER & GOLD TRADING COMMAND CENTER v2.0")
+st.markdown("**Ultra Vibrant • LSTM Forecasting • IV Surface • Full Trader Arsenal** | May 29, 2026")
+
+# ============================
+# Data Loading
+# ============================
+
+@st.cache_data(ttl=180)
+def load_data(ticker, period="2y"):
+    return yf.download(ticker, period=period)
+
+gold = load_data("GC=F")
+copper = load_data("HG=F")
+
+gold_price = gold['Close'].iloc[-1]
+copper_price = copper['Close'].iloc[-1]
+
+# Metrics Row
+c1, c2, c3, c4, c5 = st.columns(5)
+with c1:
+    st.metric("**GOLD**", f"${gold_price:,.2f}", f"{(gold['Close'].pct_change().iloc[-1]*100):.2f}%")
+with c2:
+    st.metric("**COPPER**", f"${copper_price:.4f}", f"{(copper['Close'].pct_change().iloc[-1]*100):.2f}%")
+with c3:
+    st.metric("Gold/Copper Ratio", f"{copper_price/gold_price:.5f}", "Macro Risk Signal")
+with c4:
+    st.metric("Gold 20D Vol", f"{gold['Close'].pct_change().rolling(20).std().iloc[-1]*100:.1f}%")
+with c5:
+    st.metric("Copper 20D Vol", f"{copper['Close'].pct_change().rolling(20).std().iloc[-1]*100:.1f}%")
+
+# Technical Indicators
+def add_indicators(df):
+    df['SMA_20'] = ta.sma(df['Close'], 20)
+    df['EMA_50'] = ta.ema(df['Close'], 50)
+    df['RSI'] = ta.rsi(df['Close'])
+    macd = ta.macd(df['Close'])
+    df = pd.concat([df, macd], axis=1)
+    bb = ta.bbands(df['Close'])
+    df = pd.concat([df, bb], axis=1)
+    df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+    return df
+
+gold = add_indicators(gold)
+copper = add_indicators(copper)
+
+# ============================
+# LSTM FORECASTING
+# ============================
+
+def lstm_forecast(df, steps=30, ticker="Asset"):
+    data = df['Close'].values.reshape(-1, 1)
+    scaler = MinMaxScaler()
+    scaled_data = scaler.fit_transform(data)
+    
+    X, y = [], []
+    for i in range(60, len(scaled_data)):
+        X.append(scaled_data[i-60:i, 0])
+        y.append(scaled_data[i, 0])
+    X, y = np.array(X), np.array(y)
+    X = X.reshape((X.shape[0], X.shape[1], 1))
+    
+    model = Sequential()
+    model.add(LSTM(50, return_sequences=True, input_shape=(X.shape[1], 1)))
+    model.add(Dropout(0.2))
+    model.add(LSTM(50))
+    model.add(Dropout(0.2))
+    model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mse')
+    model.fit(X, y, epochs=8, batch_size=32, verbose=0)
+    
+    last_60 = scaled_data[-60:].reshape(1, 60, 1)
+    predictions = []
+    for _ in range(steps):
+        pred = model.predict(last_60, verbose=0)
+        predictions.append(pred[0,0])
+        last_60 = np.append(last_60[:,1:,:], pred.reshape(1,1,1), axis=1)
+    
+    predictions = scaler.inverse_transform(np.array(predictions).reshape(-1,1))
+    return predictions.flatten()
+
+# ============================
+# TABS
+# ============================
+
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "📈 Live Charts", "🔥 Technicals", "📊 Ratio & Correlation", 
+    "🤖 LSTM Forecast", "🌊 Volatility Surface", "📉 Advanced Analytics"
+])
+
+with tab1:
+    col_a, col_b = st.columns(2)
+    with col_a:
+        fig_g = go.Figure(data=[go.Candlestick(x=gold.index, open=gold.Open, high=gold.High, low=gold.Low, close=gold.Close, name="Gold")])
+        fig_g.add_trace(go.Scatter(x=gold.index, y=gold.SMA_20, name="SMA20", line=dict(color='#00ffcc')))
+        fig_g.add_trace(go.Scatter(x=gold.index, y=gold.EMA_50, name="EMA50", line=dict(color='#ff00ff')))
+        fig_g.update_layout(title="Gold Futures - Neon Style", template="plotly_dark", height=480)
+        st.plotly_chart(fig_g, use_container_width=True)
+    
+    with col_b:
+        fig_c = go.Figure(data=[go.Candlestick(x=copper.index, open=copper.Open, high=copper.High, low=copper.Low, close=copper.Close, name="Copper")])
+        fig_c.add_trace(go.Scatter(x=copper.index, y=copper.SMA_20, name="SMA20", line=dict(color='#00ff00')))
+        fig_c.add_trace(go.Scatter(x=copper.index, y=copper.EMA_50, name="EMA50", line=dict(color='#ffaa00')))
+        fig_c.update_layout(title="Copper Futures - Neon Style", template="plotly_dark", height=480)
+        st.plotly_chart(fig_c, use_container_width=True)
+
+with tab2:
+    st.subheader("Technical Indicators Overload")
+    col1, col2 = st.columns(2)
+    with col1:
+        fig_rsi = make_subplots(rows=2, cols=1, row_heights=[0.65, 0.35])
+        fig_rsi.add_trace(go.Scatter(x=gold.index, y=gold.Close, name="Price", line=dict(color='gold')), row=1, col=1)
+        fig_rsi.add_trace(go.Scatter(x=gold.index, y=gold.RSI, name="RSI", line=dict(color='#ff00ff')), row=2, col=1)
+        fig_rsi.add_hline(y=70, line_color="red", row=2, col=1)
+        fig_rsi.add_hline(y=30, line_color="lime", row=2, col=1)
+        st.plotly_chart(fig_rsi, use_container_width=True)
+    
+    with col2:
+        fig_macd = go.Figure()
+        fig_macd.add_bar(x=copper.index, y=copper.MACDh_12_26_9, name="Histogram", marker_color=np.where(copper.MACDh_12_26_9 > 0, '#00ff00', '#ff0000'))
+        fig_macd.add_trace(go.Scatter(x=copper.index, y=copper.MACD_12_26_9, name="MACD", line=dict(color='cyan')))
+        fig_macd.add_trace(go.Scatter(x=copper.index, y=copper.MACDs_12_26_9, name="Signal", line=dict(color='magenta')))
+        st.plotly_chart(fig_macd, use_container_width=True)
+
+with tab4:
+    st.subheader("🤖 LSTM Price Prediction (Next 30 Days)")
+    col_l1, col_l2 = st.columns(2)
+    
+    with col_l1:
+        gold_pred = lstm_forecast(gold)
+        fig_gold_pred = go.Figure()
+        fig_gold_pred.add_trace(go.Scatter(x=gold.index[-60:], y=gold['Close'].iloc[-60:], name="Historical", line=dict(color='gold')))
+        fig_gold_pred.add_trace(go.Scatter(x=pd.date_range(start=gold.index[-1], periods=31)[1:], y=gold_pred, name="LSTM Forecast", line=dict(color='#00ffff', dash='dash')))
+        fig_gold_pred.update_layout(title="Gold 30-Day LSTM Forecast", template="plotly_dark")
+        st.plotly_chart(fig_gold_pred, use_container_width=True)
+        st.success(f"Gold Expected Move: +{((gold_pred[-1]/gold_price)-1)*100:.1f}%")
+
+    with col_l2:
+        copper_pred = lstm_forecast(copper)
+        fig_copper_pred = go.Figure()
+        fig_copper_pred.add_trace(go.Scatter(x=copper.index[-60:], y=copper['Close'].iloc[-60:], name="Historical", line=dict(color='orange')))
+        fig_copper_pred.add_trace(go.Scatter(x=pd.date_range(start=copper.index[-1], periods=31)[1:], y=copper_pred, name="LSTM Forecast", line=dict(color='#ff00ff', dash='dash')))
+        fig_copper_pred.update_layout(title="Copper 30-Day LSTM Forecast", template="plotly_dark")
+        st.plotly_chart(fig_copper_pred, use_container_width=True)
+        st.success(f"Copper Expected Move: +{((copper_pred[-1]/copper_price)-1)*100:.1f}%")
+
+with tab5:
+    st.subheader("🌊 Implied Volatility Surface (Simulated)")
+    # Simulated IV Surface for Futures Options
+    strikes = np.linspace(0.85, 1.15, 20)
+    expiries = np.array([1/12, 3/12, 6/12, 1])
+    iv_surface = np.random.normal(0.18, 0.03, (len(expiries), len(strikes))) + np.outer(expiries*0.1, np.abs(strikes-1)*0.8)
+    
+    fig_iv = go.Figure(data=[go.Surface(z=iv_surface*100, x=strikes*100, y=expiries*12, colorscale='Viridis')])
+    fig_iv.update_layout(title="Gold & Copper Implied Volatility Surface", 
+                        scene=dict(xaxis_title="Moneyness (%)", yaxis_title="Expiry (Months)", zaxis_title="IV (%)"),
+                        height=600, template="plotly_dark")
+    st.plotly_chart(fig_iv, use_container_width=True)
+
+# Sidebar
+st.sidebar.header("⚡ Quick Signals")
+st.sidebar.success("Gold RSI: " + ("Overbought" if gold.RSI.iloc[-1] > 70 else "Oversold" if gold.RSI.iloc[-1] < 30 else "Neutral"))
+st.sidebar.warning("Copper Trend: Bullish" if copper.Close.iloc[-1] > copper.SMA_20.iloc[-1] else "Bearish")
+st.sidebar.info("LSTM Bias: Upward" if gold_pred[-1] > gold_price else "Downward")
+
+st.caption("Built with maximum visual intensity • LSTM trained on-the-fly • Real-time data via yfinance")
