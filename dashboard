@@ -181,3 +181,5 @@ st.sidebar.warning("Copper Trend: Bullish" if copper.Close.iloc[-1] > copper.SMA
 st.sidebar.info("LSTM Bias: Upward" if gold_pred[-1] > gold_price else "Downward")
 
 st.caption("Built with maximum visual intensity • LSTM trained on-the-fly • Real-time data via yfinance")
+
+# Run streamlit run metals_trading_dashboard_v2.py
